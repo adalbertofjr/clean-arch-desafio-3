@@ -44,17 +44,10 @@ func main() {
 
 	createOrderUseCase := NewCreateOrderUseCase(db, eventDispatcher)
 
-	// getOrdersUseCase, err := GetOrdersUserCase(db).OrderRepository.GetOrders()
-	// if err != nil {
-	// 	fmt.Println("Error:", err)
-	// }
-	// for _, order := range getOrdersUseCase {
-	// 	fmt.Printf("Order ID: %s, Price: %.2f, Tax: %.2f, Final Price: %.2f\n", order.ID, order.Price, order.Tax, order.FinalPrice)
-	// }
-
 	webserver := webserver.NewWebServer(configs.WebServerPort)
 	webOrderHandler := NewWebOrderHandler(db, eventDispatcher)
 	webserver.AddHandler("/order", webOrderHandler.Create)
+	webserver.AddHandler("/orders", webOrderHandler.List)
 	fmt.Println("Starting web server on port", configs.WebServerPort)
 	go webserver.Start()
 
