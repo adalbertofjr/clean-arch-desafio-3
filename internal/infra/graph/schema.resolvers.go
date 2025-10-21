@@ -7,13 +7,13 @@ package graph
 import (
 	"context"
 
+	"github.com/devfullcycle/20-CleanArch/internal/dto"
 	"github.com/devfullcycle/20-CleanArch/internal/infra/graph/model"
-	"github.com/devfullcycle/20-CleanArch/internal/usecase"
 )
 
 // CreateOrder is the resolver for the createOrder field.
 func (r *mutationResolver) CreateOrder(ctx context.Context, input *model.OrderInput) (*model.Order, error) {
-	dto := usecase.OrderInputDTO{
+	dto := dto.OrderInputDTO{
 		ID:    input.ID,
 		Price: float64(input.Price),
 		Tax:   float64(input.Tax),
