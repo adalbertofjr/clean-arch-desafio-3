@@ -2,6 +2,30 @@
 
 Sistema de gerenciamento de pedidos (orders) desenvolvido seguindo os princípios de Clean Architecture, com múltiplas interfaces de acesso (REST API, gRPC e GraphQL).
 
+## 📑 Índice
+
+- [📋 Descrição do Projeto](#-descrição-do-projeto)
+- [🏗️ Arquitetura](#️-arquitetura)
+- [🚀 Tecnologias Utilizadas](#-tecnologias-utilizadas)
+- [📦 Pré-requisitos](#-pré-requisitos)
+- [⚡ Quick Start](#-quick-start)
+- [🔧 Configuração](#-configuração)
+- [🐳 Executando com Docker](#-executando-com-docker)
+- [🗄️ Migrations](#️-migrations)
+- [▶️ Executando a Aplicação](#️-executando-a-aplicação)
+- [📡 Portas dos Serviços](#-portas-dos-serviços)
+- [🧪 Testando a Aplicação](#-testando-a-aplicação)
+  - [REST API](#rest-api)
+  - [GraphQL](#graphql)
+  - [gRPC](#grpc)
+  - [Arquivo order.http](#arquivo-orderhttp)
+- [🗂️ Estrutura do Banco de Dados](#️-estrutura-do-banco-de-dados)
+- [🛠️ Desenvolvimento](#️-desenvolvimento)
+- [📚 Use Cases Implementados](#-use-cases-implementados)
+- [🔍 Troubleshooting](#-troubleshooting)
+- [📄 Licença](#-licença)
+- [👨‍💻 Autor](#-autor)
+
 ## 📋 Descrição do Projeto
 
 Este projeto implementa um sistema completo de criação e listagem de pedidos utilizando:
@@ -38,9 +62,10 @@ O projeto segue os princípios de Clean Architecture com a seguinte estrutura:
 ## 🚀 Tecnologias Utilizadas
 
 - **Go 1.24+** - Linguagem de programação
-- **MySQL 5.7** - Banco de dados
+- **MySQL 8.0** - Banco de dados
 - **RabbitMQ** - Message broker
 - **Docker & Docker Compose** - Containerização
+- **golang-migrate** - Gerenciamento de migrations
 - **gRPC** - Framework RPC
 - **GraphQL (gqlgen)** - API GraphQL
 - **Chi Router** - Router HTTP
@@ -53,6 +78,104 @@ O projeto segue os princípios de Clean Architecture com a seguinte estrutura:
 - Go 1.24 ou superior (para desenvolvimento)
 - Protocol Buffers Compiler (protoc) - para gerar código gRPC
 - Evans CLI (opcional) - para testar gRPC
+
+## ⚡ Quick Start
+
+Siga estes passos para executar o projeto rapidamente:
+
+### 1️⃣ Execute o Docker Compose
+
+Inicie os serviços de infraestrutura (MySQL, RabbitMQ e Migrations):
+
+```bash
+docker-compose up -d
+```
+
+Aguarde alguns segundos para que o MySQL inicialize e as migrations sejam executadas automaticamente.
+
+### 2️⃣ Inicie o servidor
+
+Navegue até o diretório da aplicação e execute:
+
+```bash
+cd cmd/ordersystem
+go run main.go wire_gen.go
+```
+
+O servidor iniciará com os seguintes serviços:
+- 🌐 REST API na porta `8000`
+- 🔌 gRPC na porta `50052`
+- 📊 GraphQL na porta `8080`
+
+### 3️⃣ Teste a REST API
+
+Use o arquivo `api/order.http` (com extensão REST Client no VS Code) ou execute:
+
+```bash
+# Criar um pedido
+curl -X POST http://localhost:8000/order \
+  -H "Content-Type: application/json" \
+  -d '{"id":"order-001","price":100.5,"tax":0.5}'
+
+# Listar pedidos
+curl http://localhost:8000/orders
+```
+
+### 4️⃣ Teste o GraphQL
+
+Acesse o playground GraphQL em: **http://localhost:8080**
+
+Execute uma query:
+
+```graphql
+query {
+  listOrders {
+    id
+    Price
+    Tax
+    FinalPrice
+  }
+}
+```
+
+Ou uma mutation:
+
+```graphql
+mutation {
+  createOrder(input: {id: "order-002", Price: 200.0, Tax: 10.0}) {
+    id
+    FinalPrice
+  }
+}
+```
+
+### 5️⃣ Teste o gRPC com Evans
+
+Instale o Evans CLI (se ainda não tiver):
+
+```bash
+# macOS
+brew install evans
+
+# Ou via Go
+go install github.com/ktr0731/evans@latest
+```
+
+Conecte-se ao servidor gRPC:
+
+```bash
+evans -r repl -p 50052
+
+# Dentro do Evans:
+package pb
+service OrderService
+
+# Criar pedido
+call CreateOrder
+
+# Listar pedidos
+call ListOrders
+```
 
 ## 🔧 Configuração
 
@@ -81,38 +204,86 @@ GRAPHQL_SERVER_PORT=8080
 
 ## 🐳 Executando com Docker
 
-### Subir a infraestrutura (MySQL e RabbitMQ)
+### Subir toda a infraestrutura
+
+O projeto está configurado para subir automaticamente toda a infraestrutura necessária:
 
 ```bash
 docker-compose up -d
 ```
 
-Isso irá iniciar:
-- **MySQL** na porta `3306`
-- **RabbitMQ** na porta `5672` (management UI na porta `15672`)
+Isso irá:
+1. **Iniciar o MySQL** na porta `3306` com healthcheck
+2. **Iniciar o RabbitMQ** na porta `5672` (management UI na porta `15672`)
+3. **Executar as migrations automaticamente** assim que o MySQL estiver pronto
 
-### Criar o banco de dados e tabelas
+### Verificar se tudo está rodando
 
 ```bash
-# Conectar ao MySQL
-docker exec -it mysql mysql -uroot -proot
+# Ver status dos containers
+docker-compose ps
 
-# Criar o banco de dados
-CREATE DATABASE IF NOT EXISTS orders;
-USE orders;
+# Ver logs das migrations
+docker-compose logs migrate
 
-# Criar a tabela de orders
-CREATE TABLE orders (
-    id VARCHAR(255) NOT NULL,
-    price FLOAT NOT NULL,
-    tax FLOAT NOT NULL,
-    final_price FLOAT NOT NULL,
-    PRIMARY KEY (id)
-);
-
-# Sair
-EXIT;
+# Ver logs do MySQL
+docker-compose logs mysql
 ```
+
+### Parar os serviços
+
+```bash
+# Parar todos os containers
+docker-compose down
+
+# Parar e remover volumes (⚠️ apaga os dados do banco)
+docker-compose down -v
+```
+
+## 🗄️ Migrations
+
+As migrations são executadas automaticamente pelo Docker Compose, mas você também pode gerenciá-las manualmente:
+
+### Executar migrations manualmente
+
+```bash
+# Executar todas as migrations pendentes
+docker-compose run --rm migrate -path /migrations -database "mysql://root:root@tcp(mysql:3306)/orders" up
+
+# Executar apenas 1 migration
+docker-compose run --rm migrate -path /migrations -database "mysql://root:root@tcp(mysql:3306)/orders" up 1
+
+# Verificar versão atual
+docker-compose run --rm migrate -path /migrations -database "mysql://root:root@tcp(mysql:3306)/orders" version
+```
+
+### Rollback de migrations
+
+```bash
+# Fazer rollback de todas as migrations
+docker-compose run --rm migrate -path /migrations -database "mysql://root:root@tcp(mysql:3306)/orders" down
+
+# Fazer rollback de 1 migration
+docker-compose run --rm migrate -path /migrations -database "mysql://root:root@tcp(mysql:3306)/orders" down 1
+```
+
+### Criar nova migration
+
+```bash
+# Instalar golang-migrate localmente (uma vez)
+# macOS
+brew install golang-migrate
+
+# Ou via Go
+go install -tags 'mysql' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+# Criar nova migration
+migrate create -ext=sql -dir=sql/migrations -seq nome_da_migration
+```
+
+Isso criará dois arquivos:
+- `000002_nome_da_migration.up.sql` - Para aplicar a migration
+- `000002_nome_da_migration.down.sql` - Para reverter a migration
 
 ## ▶️ Executando a Aplicação
 
@@ -273,6 +444,16 @@ Host: localhost:8000
 
 ## 🛠️ Desenvolvimento
 
+### Estrutura de Migrations
+
+As migrations estão localizadas em `sql/migrations/`:
+
+```
+sql/migrations/
+├── 000001_init.up.sql     # Cria a tabela orders
+└── 000001_init.down.sql   # Remove a tabela orders
+```
+
 ### Gerar código gRPC
 
 ```bash
@@ -296,6 +477,16 @@ go test ./...
 ```bash
 cd cmd/ordersystem
 wire
+```
+
+### Acessar o banco de dados
+
+```bash
+# Via Docker
+docker exec -it mysql mysql -uroot -proot orders
+
+# Ou conectar de fora
+mysql -h localhost -P 3306 -u root -proot orders
 ```
 
 ## 📚 Use Cases Implementados
@@ -334,6 +525,26 @@ Certifique-se de que o MySQL está rodando:
 docker ps | grep mysql
 ```
 
+Verifique os logs do MySQL:
+
+```bash
+docker-compose logs mysql
+```
+
+### Migrations não foram executadas
+
+Verifique os logs do serviço de migration:
+
+```bash
+docker-compose logs migrate
+```
+
+Execute manualmente se necessário:
+
+```bash
+docker-compose run --rm migrate -path /migrations -database "mysql://root:root@tcp(mysql:3306)/orders" up
+```
+
 ### RabbitMQ não conecta
 
 Verifique se o RabbitMQ está ativo:
@@ -343,6 +554,23 @@ docker ps | grep rabbitmq
 ```
 
 Acesse o management: `http://localhost:15672` (usuário: `guest`, senha: `guest`)
+
+### Problema com arquitetura ARM64 (Apple Silicon)
+
+O projeto está configurado com `platform: linux/amd64` no docker-compose para garantir compatibilidade. Se tiver problemas de performance, você pode remover essa linha, pois MySQL 8.0 tem suporte nativo para ARM64.
+
+### Limpar ambiente e começar do zero
+
+```bash
+# Parar containers e remover volumes
+docker-compose down -v
+
+# Remover pasta de dados do MySQL
+rm -rf .docker/mysql
+
+# Subir tudo novamente
+docker-compose up -d
+```
 
 ## 📄 Licença
 
