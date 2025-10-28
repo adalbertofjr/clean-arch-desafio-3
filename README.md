@@ -83,7 +83,14 @@ O projeto segue os princípios de Clean Architecture com a seguinte estrutura:
 
 Siga estes passos para executar o projeto rapidamente:
 
-### 1️⃣ Execute o Docker Compose
+### 1️⃣ Clone o repositório
+
+```bash
+git clone git@github.com:adalbertofjr/clean-arch-desafio-3.git
+cd clean-arch-desafio-3
+```
+
+### 2️⃣ Execute o Docker Compose
 
 Inicie os serviços de infraestrutura (MySQL, RabbitMQ e Migrations):
 
@@ -93,7 +100,7 @@ docker-compose up -d
 
 Aguarde alguns segundos para que o MySQL inicialize e as migrations sejam executadas automaticamente.
 
-### 2️⃣ Inicie o servidor
+### 3️⃣ Inicie o servidor
 
 Navegue até o diretório da aplicação e execute:
 
@@ -104,10 +111,10 @@ go run main.go wire_gen.go
 
 O servidor iniciará com os seguintes serviços:
 - 🌐 REST API na porta `8000`
-- 🔌 gRPC na porta `50052`
+- 🔌 gRPC na porta `50051`
 - 📊 GraphQL na porta `8080`
 
-### 3️⃣ Teste a REST API
+### 4️⃣ Teste a REST API
 
 Use o arquivo `api/order.http` (com extensão REST Client no VS Code) ou execute:
 
@@ -121,18 +128,18 @@ curl -X POST http://localhost:8000/order \
 curl http://localhost:8000/orders
 ```
 
-### 4️⃣ Teste o GraphQL
+### 5️⃣ Teste o GraphQL
 
 Acesse o playground GraphQL em: **http://localhost:8080**
 
 Execute uma query:
 
 ```graphql
-query {
-  listOrders {
-    id
-    Price
-    Tax
+query listOrders{
+  listOrders{
+    id,
+    Price,
+    Tax,
     FinalPrice
   }
 }
@@ -141,15 +148,15 @@ query {
 Ou uma mutation:
 
 ```graphql
-mutation {
-  createOrder(input: {id: "order-002", Price: 200.0, Tax: 10.0}) {
+mutation createOrder{
+  createOrder(input: {id: "order-003", Price: 200.0, Tax: 10.0}) {
     id
     FinalPrice
   }
 }
 ```
 
-### 5️⃣ Teste o gRPC com Evans
+### 6️⃣ Teste o gRPC com Evans
 
 Instale o Evans CLI (se ainda não tiver):
 
@@ -164,7 +171,7 @@ go install github.com/ktr0731/evans@latest
 Conecte-se ao servidor gRPC:
 
 ```bash
-evans -r repl -p 50052
+evans -r repl -p 50051
 
 # Dentro do Evans:
 package pb
@@ -198,7 +205,7 @@ DB_USER=root
 DB_PASSWORD=root
 DB_NAME=orders
 WEB_SERVER_PORT=:8000
-GRPC_SERVER_PORT=50052
+GRPC_SERVER_PORT=50051
 GRAPHQL_SERVER_PORT=8080
 ```
 
@@ -307,7 +314,7 @@ go build -o ordersystem
 | Serviço | Porta | Descrição |
 |---------|-------|-----------|
 | REST API | `8000` | Endpoints HTTP |
-| gRPC | `50052` | Serviço gRPC |
+| gRPC | `50051` | Serviço gRPC |
 | GraphQL | `8080` | API GraphQL |
 | MySQL | `3306` | Banco de dados |
 | RabbitMQ | `5672` | Message broker |
@@ -375,7 +382,7 @@ mutation {
 
 ```bash
 # Conectar ao servidor gRPC
-evans -r repl -p 50052
+evans -r repl -p 50051
 
 # Dentro do Evans
 package pb
@@ -397,17 +404,17 @@ call ListOrders
 
 ```bash
 # Listar serviços disponíveis
-grpcurl -plaintext localhost:50052 list
+grpcurl -plaintext localhost:50051 list
 
 # Criar pedido
 grpcurl -plaintext -d '{
   "id": "order-004",
   "price": 300.0,
   "tax": 15.0
-}' localhost:50052 pb.OrderService/CreateOrder
+}' localhost:50051 pb.OrderService/CreateOrder
 
 # Listar pedidos
-grpcurl -plaintext -d '{}' localhost:50052 pb.OrderService/ListOrders
+grpcurl -plaintext -d '{}' localhost:50051 pb.OrderService/ListOrders
 ```
 
 ### Arquivo order.http
